@@ -1,0 +1,325 @@
+﻿@page "/fivedayweather"
+@using WeatherForecasting.Components.Layout.Model
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@rendermode InteractiveServer
+
+<PageTitle>Weather Forecaste </PageTitle>
+
+<style>
+    .weather-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+    }
+
+    .search-container {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 20px;
+    }
+
+        .search-container input {
+            width: 300px;
+            margin-right: 10px;
+            padding: 5px;
+        }
+
+        .search-container button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 5px 15px;
+            cursor: pointer;
+        }
+    .city-header {
+        background-color: #3498db;
+        color: white;
+        padding: 10px 20px;
+        border-radius: 5px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .weather-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+    }
+
+        .weather-table th, .weather-table td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+
+        .weather-table th {
+            background-color: #f2f2f2;
+        }
+
+    .forecast-header {
+        font-size: 1.2em;
+        margin-top: 20px;
+        margin-bottom: 10px;
+    }
+
+
+    .welcome-text {
+        font-family: 'Arial', sans-serif;
+        color: #1a237e;
+        font-weight: bold;
+        margin-bottom: 15px;
+    }
+
+    .center-content {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+</style>
+<div class="center-content">
+<h3 class=" welcome-text"> Know Present,Past and Future Weather </h3>
+<div class="weather-container">
+    <div class="search-container">
+        <input type="text" @bind-value="cityName" placeholder="Enter the city...." />
+        <button @onclick="Data">Search</button>
+    </div>
+    </div>
+    @if (filename != null)
+    {
+        <div class="city-header">
+            <h2>@cityName</h2>
+        </div>
+
+        <table class="weather-table">
+            <tr>
+                <th>Temperature</th>
+                <td>@filename.main.temp &deg;C</td>
+            </tr>
+            <tr>
+                <th>Coordinates</th>
+                <td>[@filename.coord.lon, @filename.coord.lat]</td>
+            </tr>
+            <tr>
+                <th>Description</th>
+                <td>@filename.weather[0].description</td>
+            </tr>
+            <tr>
+                <th>Feels Like</th>
+                <td>@filename.main.feels_like &deg;C</td>
+            </tr>
+            <tr>
+                <th>Pressure</th>
+                <td>@filename.main.pressure hPa</td>
+            </tr>
+            <tr>
+                <th>Humidity</th>
+                <td>@filename.main.humidity %</td>
+            </tr>
+            <tr>
+                <th>Wind Speed</th>
+                <td>@filename.wind.speed m/s</td>
+            </tr>
+            <tr>
+                <th>Wind Degree</th>
+                <td>@filename.wind.deg &deg;</td>
+            </tr>
+            <tr>
+                <th>Sunrise</th>
+                <td>@DateTimeOffset.FromUnixTimeSeconds(filename.sys.sunrise).ToLocalTime().TimeOfDay</td>
+            </tr>
+            <tr>
+                <th>Sunset</th>
+                <td>@DateTimeOffset.FromUnixTimeSeconds(filename.sys.sunset).ToLocalTime().TimeOfDay</td>
+            </tr>
+        </table>
+
+        <h3 class="forecast-header">Past 5 Days Weather Forecast</h3>
+        <table class="weather-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Temperature (C)</th>
+                    <th>Temperature (F)</th>
+                    <th>Summary</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var forecast in pastFiveDays)
+                {
+                    <tr>
+                        <td>@forecast.Date.ToShortDateString()</td>
+                        <td>@forecast.TemperatureC</td>
+                        <td>@forecast.TemperatureF</td>
+                        <td>@forecast.Summary</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <h3 class="forecast-header">Future 5 Days Weather Forecast</h3>
+        <table class="weather-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Temperature (C)</th>
+                    <th>Temperature (F)</th>
+                    <th>Summary</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var forecast in futureForecasts)
+                {
+                    <tr>
+                        <td>@forecast.Date.ToShortDateString()</td>
+                        <td>@forecast.TemperatureC</td>
+                        <td>@forecast.TemperatureF</td>
+                        <td>@forecast.Summary</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+@code {
+    public FileName filename;
+    public long dummy { get; set; }
+    public string country { get; set; }
+    public double temp { get; set; }
+    public float lon { get; set; }
+    public float lat { get; set; }
+    public string description { get; set; }
+    public float feels_like { get; set; }
+    public int pressure { get; set; }
+    public int humidity { get; set; }
+    public int sea_level { get; set; }
+    public int grnd_level { get; set; }
+    public int deg { get; set; }
+    public long sunrise { get; set; }
+    public long sunset { get; set; }
+    public int timezone { get; set; }
+    public HttpClient httpClient = new HttpClient();
+    private WeatherData wd = new();
+
+
+    private string inputtext = "";
+    private string cityName;
+
+    private string ApiKey = "4d7d0912d819bc8ea0e6661d1cc2b571";
+    private WeatherForecast[] futureForecasts;
+    private WeatherForecast[] pastFiveDays;
+    protected override void OnInitialized()
+    {
+        var currentDate = DateTime.Now;
+        var startDate = currentDate.AddDays(-4);
+        pastFiveDays = Enumerable.Range(0, 5).Select(index => new WeatherForecast
+            {
+                Date = startDate.AddDays(index),
+                TemperatureC = Random.Shared.Next(10, 35),
+                Summary = GetRandomSummary()
+            }).ToArray();
+        var endDate = currentDate.AddDays(1);
+        futureForecasts = Enumerable.Range(0, 5).Select(index => new WeatherForecast
+            {
+                Date = endDate.AddDays(index),
+                TemperatureC = Random.Shared.Next(10, 35),
+                Summary = GetRandomSummary()
+            }).ToArray();
+    }
+    private string GetRandomSummary()
+    {
+        var summaries = new[] { "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching" };
+        return summaries[Random.Shared.Next(summaries.Length)];
+    }
+    public async Task Data()
+    {
+        try
+        {
+            Console.WriteLine("clicked");
+
+            string apiUrl = $"http://api.openweathermap.org/data/2.5/weather?q={cityName}&appid={ApiKey}&units=metric";
+            filename = await httpClient.GetFromJsonAsync<FileName>(apiUrl);
+
+            if (filename is not null)
+            {
+                dummy = filename.dt;
+                country = filename.sys.country;
+                temp = filename.main.temp;
+                InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (Exception)
+        {
+            Console.WriteLine("error");
+        }
+    }
+    public class Coord
+    {
+        public float lon { get; set; }
+        public float lat { get; set; }
+    }
+    public class Weathers
+    {
+        public int id { get; set; }
+        public string main { get; set; }
+        public string description { get; set; }
+        public string icon { get; set; }
+    }
+    public class Main
+    {
+        public float temp { get; set; }
+        public float feels_like { get; set; }
+        public float temp_min { get; set; }
+        public float temp_max { get; set; }
+        public int pressure { get; set; }
+        public int humidity { get; set; }
+        public int sea_level { get; set; }
+        public int grnd_level { get; set; }
+    }
+    public class Wind
+    {
+        public float speed { get; set; }
+        public int deg { get; set; }
+        public float gust { get; set; }
+    }
+    public class Clouds
+    {
+        public int all { get; set; }
+    }
+    public class Sys
+    {
+        public string country { get; set; }
+        public long sunrise { get; set; }
+        public long sunset { get; set; }
+    }
+    public class WeatherData
+    {
+        public Coord coord { get; set; }
+        public List<Weathers> weather { get; set; }
+        public string @base { get; set; }
+        public Main main { get; set; }
+        public int visibility { get; set; }
+        public Wind wind { get; set; }
+        public Clouds clouds { get; set; }
+        public long dt { get; set; }
+        public Sys sys { get; set; }
+        public int timezone { get; set; }
+        public int id { get; set; }
+        public string name { get; set; }
+        public int cod { get; set; }
+    }
+    private class WeatherForecast
+    {
+        public DateTime Date { get; set; }
+        public int TemperatureC { get; set; }
+        public string Summary { get; set; }
+        public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+    }
+}
+
+
+
+
+         

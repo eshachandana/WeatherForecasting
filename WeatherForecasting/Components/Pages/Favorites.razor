@@ -1,0 +1,266 @@
+﻿@page "/favorite"
+@using WeatherForecasting.Models
+@using WeatherForecasting.Services
+@inject FavoriteCityService FavoriteCityService
+@inject HttpClient httpClient
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@rendermode InteractiveServer
+
+<PageTitle>Favorites</PageTitle>
+
+<style>
+    :root {
+        --primary-color: #3498db;
+        --secondary-color: #2c3e50;
+        --accent-color: #e74c3c;
+        --background-color: #ecf0f1;
+        --text-color: #34495e;
+        --card-background: #ffffff;
+    }
+
+    body {
+        background-color: var(--background-color);
+        color: var(--text-color);
+        font-family: 'Arial', sans-serif;
+    }
+
+    .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .center-content {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+    .favorites-title {
+        color: var(--secondary-color);
+        font-size: 2.5em;
+        font-weight: bold;
+        margin-bottom: 15px;
+    }
+
+    .favorites-subtitle {
+        color: var(--primary-color);
+        font-size: 1.6em;
+        margin-bottom: 25px;
+    }
+
+    .favorite-city-card {
+        background-color: var(--card-background);
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+        overflow: hidden;
+    }
+
+    .favorite-city-header {
+        background-color: var(--primary-color);
+        color: white;
+        padding: 15px;
+        font-size: 1.4em;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .favorite-city-content {
+        padding: 20px;
+    }
+
+    .weather-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+        .weather-table th, .weather-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .weather-table th {
+            background-color: var(--secondary-color);
+            color: white;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 14px;
+            width: 50%;
+        }
+
+        .weather-table tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+
+        .weather-table tr:last-child td {
+            border-bottom: none;
+        }
+
+    .delete-button {
+        background-color: var(--accent-color);
+        color: white;
+        border: none;
+        padding: 8px 15px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+        font-size: 14px;
+    }
+
+        .delete-button:hover {
+            background-color: #c0392b;
+        }
+
+    .loading-spinner {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100px;
+    }
+
+    .spinner {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid var(--primary-color);
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+    }
+
+    @@keyframes spin {
+        0% {
+            transform: rotate(0deg);
+        }
+
+        100% {
+            transform: rotate(360deg);
+        }
+    }
+</style>
+
+<div class="container">
+    <div class="center-content">
+        <h2 class="favorites-title">Favorites</h2>
+        <h3 class="favorites-subtitle">My list of favorite cities</h3>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+        </div>
+    }
+    else
+    {
+        @if (favoriteCities.Count > 0)
+        {
+            @foreach (var city in favoriteCities)
+            {
+                <div class="favorite-city-card">
+                    <div class="favorite-city-header">
+                        <h3>@city</h3>
+                        <button class="delete-button" @onclick="() => RemoveFavoriteCity(city)">Remove City</button>
+                    </div>
+                    <div class="favorite-city-content">
+                        @if (weatherDict.ContainsKey(city))
+                        {
+                            <table class="weather-table">
+                                <tr>
+                                    <th>Temperature</th>
+                                    <td>@weatherDict[city].Main.Temp °C</td>
+                                </tr>
+                                <tr>
+                                    <th>Feels Like</th>
+                                    <td>@weatherDict[city].Main.feels_like °C</td>
+                                </tr>
+                                <tr>
+                                    <th>Humidity</th>
+                                    <td>@weatherDict[city].Main.humidity %</td>
+                                </tr>
+                                <tr>
+                                    <th>Pressure</th>
+                                    <td>@weatherDict[city].Main.pressure hPa</td>
+                                </tr>
+                                <tr>
+                                    <th>Minimum Temperature</th>
+                                    <td>@weatherDict[city].Main.Temp_min °C</td>
+                                </tr>
+                                <tr>
+                                    <th>Maximum Temperature</th>
+                                    <td>@weatherDict[city].Main.Temp_max °C</td>
+                                </tr>
+                            </table>
+                        }
+                        else
+                        {
+                            <div class="loading-spinner">
+                                <div class="spinner"></div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        }
+        else
+        {
+            <p>No favorite cities added yet.</p>
+        }
+    }
+</div>
+@code {
+    private List<string> favoriteCities = new List<string>();
+    private Dictionary<string, WeatherforcastingModel> weatherDict = new Dictionary<string, WeatherforcastingModel>();
+    private string ApiKey = "4d7d0912d819bc8ea0e6661d1cc2b571";
+    private bool isLoading = true;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadFavoriteCities();
+            await LoadWeatherForFavoriteCities();
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadFavoriteCities()
+    {
+        favoriteCities = await FavoriteCityService.GetFavoriteCitiesAsync();
+        isLoading = false;
+    }
+
+    private async Task RemoveFavoriteCity(string cityName)
+    {
+        await FavoriteCityService.RemoveFavoriteCityAsync(cityName);
+        await LoadFavoriteCities();
+        await LoadWeatherForFavoriteCities();
+    }
+
+    private async Task LoadWeatherForFavoriteCities()
+    {
+        weatherDict.Clear();
+        foreach (var city in favoriteCities)
+        {
+            try
+            {
+                string apiUrl = $"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={ApiKey}&units=metric";
+                var response = await httpClient.GetFromJsonAsync<WeatherforcastingModel>(apiUrl);
+                if (response != null)
+                {
+                    weatherDict[city] = response;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error fetching weather for {city}: {ex.Message}");
+            }
+        }
+    }
+}

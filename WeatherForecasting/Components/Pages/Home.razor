@@ -1,0 +1,362 @@
+﻿@page "/"
+@using WeatherForecasting.Models
+@using WeatherForecasting.Services
+@inject NavigationManager Navigation
+@inject FavoriteCityService FavoriteCityService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@rendermode InteractiveServer
+
+<PageTitle>Weather Forecasting </PageTitle>
+
+<style>
+    .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .center-content {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+    .welcome-text {
+        font-family: 'Arial', sans-serif;
+        color: #1a237e;
+        font-size: 2.8em;
+        font-weight: bold;
+        margin-bottom: 15px;
+    }
+
+    .fetch-text {
+        font-family: 'Helvetica', sans-serif;
+        color: #3949ab;
+        font-size: 1.6em;
+        margin-bottom: 25px;
+    }
+
+    .search-container {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 30px;
+    }
+
+        .search-container input {
+            width: 300px;
+            margin-right: 10px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+
+        .search-container button {
+            background-color: #1565c0;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+
+            .search-container button:hover {
+                background-color: #0d47a1;
+            }
+
+    .weather-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+        .weather-table th, .weather-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .weather-table th {
+            background-color: #f8bbd0;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 14px;
+        }
+
+        .weather-table tr:last-child td {
+            border-bottom: none;
+        }
+
+    .circle-button {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background-color: green;
+        text-align: center;
+        line-height: 30px;
+        color: white;
+        font-size: 20px;
+        border: none;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+
+        .circle-button:hover {
+            background-color: #45a049;
+        }
+
+    .favorites-container {
+        background-color: #f5f5f5;
+        border-radius: 8px;
+        padding: 20px;
+        margin-top: 30px;
+    }
+
+    .favorites-title {
+        font-size: 1.5em;
+        color: #333;
+        margin-bottom: 15px;
+    }
+
+    .favorite-city {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: white;
+        padding: 10px 15px;
+        margin-bottom: 10px;
+        border-radius: 4px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+        .favorite-city h6 {
+            margin: 0;
+            font-size: 16px;
+        }
+
+
+    .delete-button {
+        background-color: red;
+        color: white;
+        border: none;
+        padding: 5px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+
+        .delete-button:hover {
+            background-color: #d32f2f;
+        }
+</style>
+
+<div class="container">
+<div class="center-content">
+    <h2 class="welcome-text">Welcome</h2>
+    <h3 class="fetch-text">Fetch live weather updates now!</h3>
+</div>
+</div>
+
+<div class="search-container">
+
+    <input type="text" @bind-value="cityName1" placeholder="Enter the city..." />
+    <button @onclick="Fetch"> Search Now </button>
+</div>
+
+<br />
+
+
+
+@if (weather1 != null)
+{
+
+    <table class="weather-table">
+
+        <tr>
+            <th>Favorite</th>
+            <th>City</th>
+            <th>Temperature (°C)</th>
+            <th>Feels Like (°C)</th>
+            <th>Humidity (%)</th>
+            <th>Pressure (hPa)</th>
+            <th>Minimum Temperature</th>
+            <th>Maximum Temperature</th>
+
+        </tr>
+        <tr>
+            <td>
+                <span class="favorite-icon @(IsFavorite(weather1.Name) ? "active" : "")">
+                    <button class="circle-button" @onclick="() => ToggleFavorite(weather1.Name)">
+                        &#x2b;
+                    </button>
+                </span>
+
+            </td>
+            <td>@weather1.Name, @weather1.Sys.Country</td>
+            <td>@weather1.Main.Temp</td>
+            <td>@weather1.Main.feels_like</td>
+            <td>@weather1.Main.humidity</td>
+            <td>@weather1.Main.pressure</td>
+            <td>@weather1.Main.Temp_min</td>
+            <td>@weather1.Main.Temp_max</td>
+
+        </tr>
+
+    </table>
+
+}
+<style>
+    .circle-button {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background-color: green;
+        text-align: center;
+        line-height: 30px;
+        color: white;
+        font-size: 16px;
+        border: none;
+        cursor: pointer;
+</style>
+
+ <div class="favorites-container">
+        <h3 class="favorites-title">List of Favorites</h3>
+
+@if (favoriteCities.Count > 0)
+{
+    
+        @foreach (var city in favoriteCities)
+        {
+            <div class="favorite-city">
+              
+                    <h6>@city</h6>
+
+               
+                <button class="delete-button" @onclick="() => RemoveFavoriteCity(city)">Remove City </button>
+            </div>
+        }
+   
+}
+
+else
+{
+    <p>No favorite cities added yet.</p>
+}
+
+</div>
+
+<style>
+    .delete-button {
+        background-color: red;
+        color: white;
+        border: none;
+        padding: 5px 10px;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+
+
+</style>
+
+@code {
+    public WeatherforcastingModel? weather1;
+
+    private Dictionary<string, WeatherforcastingModel> weatherDict = new Dictionary<string, WeatherforcastingModel>();
+
+    private string? cityName1;
+
+    private string ApiKey = "4d7d0912d819bc8ea0e6661d1cc2b571";
+    public HttpClient httpClient = new HttpClient();
+
+    private List<string> favoriteCities = new List<string>();
+    private bool isInitialized;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !isInitialized)
+        {
+            await LoadFavoriteCities();
+            await LoadWeatherForFavoriteCities();
+            isInitialized = true;
+        }
+    }
+
+    public async Task Fetch()
+    {
+        try
+        {
+            string apiUrl1 = $"https://api.openweathermap.org/data/2.5/weather?q={cityName1}&appid={ApiKey}&units=metric";
+            weather1 = await httpClient.GetFromJsonAsync<WeatherforcastingModel>(apiUrl1);
+        }
+        catch (Exception)
+        {
+            Console.WriteLine("error");
+        }
+
+
+    }
+
+
+
+
+
+    private async Task LoadFavoriteCities()
+    {
+        favoriteCities = await FavoriteCityService.GetFavoriteCitiesAsync();
+    }
+
+    private async Task RemoveFavoriteCity(string cityName)
+    {
+        await FavoriteCityService.RemoveFavoriteCityAsync(cityName);
+        await LoadFavoriteCities();
+        await LoadWeatherForFavoriteCities();
+    }
+
+    private async Task LoadWeatherForFavoriteCities()
+    {
+        weatherDict.Clear();
+        foreach (var city in favoriteCities)
+        {
+            try
+            {
+                string apiUrl = $"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={ApiKey}&units=metric";
+                var response = await httpClient.GetFromJsonAsync<WeatherforcastingModel>(apiUrl);
+                if (response != null)
+                {
+                    weatherDict[city] = response;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error fetching weather for {city}: {ex.Message}");
+            }
+        }
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private bool IsFavorite(string cityName)
+    {
+        return favoriteCities.Contains(cityName);
+    }
+
+    private async Task ToggleFavorite(string cityName)
+    {
+        if (IsFavorite(cityName))
+        {
+            await FavoriteCityService.RemoveFavoriteCityAsync(cityName);
+        }
+        else
+        {
+            await FavoriteCityService.AddFavoriteCityAsync(cityName);
+        }
+        Navigation.NavigateTo("/favorite");
+        await LoadFavoriteCities();
+    }
+}   
